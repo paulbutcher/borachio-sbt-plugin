@@ -22,8 +22,8 @@ import sbt._
 import Keys._
 
 object BorachioPlugin extends Plugin {
-
-  lazy val GenerateMocks = config("generate-mocks")
+  
+  lazy val GenerateMocks = config("generate-mocks") hide
   lazy val Mock = config("mock") extend(Compile)
   
   lazy val generatedMockDirectory = SettingKey[File]("generated-mock-directory", "Where generated mock source code will be placed")
@@ -48,13 +48,11 @@ object BorachioPlugin extends Plugin {
     inConfig(GenerateMocks)(Defaults.configSettings) ++ 
     inConfig(Mock)(Defaults.configSettings) ++
     Seq(
-      publish := (),
       generatedMockDirectory <<= sourceManaged(_ / "mock" / "scala"),
       generatedTestDirectory <<= sourceManaged(_ / "test" / "scala"),
       scalacOptions in GenerateMocks <++= 
         (generatedMockDirectory, generatedTestDirectory) map { (gm, gt) =>
           Seq(
-            "-Xplugin:compiler_plugin/target/scala-2.9.0/borachio-compiler-plugin_2.9.0-2.0-SNAPSHOT.jar",
             "-Xplugin-require:borachio",
             "-Ylog:generatemocks",
             "-Ystop-after:generatemocks",
@@ -64,7 +62,8 @@ object BorachioPlugin extends Plugin {
       sources in Test <++= collectSource(generatedTestDirectory),
       sources in Mock <++= collectSource(generatedMockDirectory),
       sources in Mock <++= collectSource(generatedTestDirectory),
-      generateMocks <<= generateMocksTask,
+      generateMocks <<= generateMocksTask dependsOn(compile in Compile),
+      compile in Test <<= (compile in Test) dependsOn(compile in Mock),
       testOptions in Test <+= classDirectory in Mock map { dir =>
         Tests.Argument(TestFrameworks.ScalaTest, "-Dmock.classes=" + dir)
       })
